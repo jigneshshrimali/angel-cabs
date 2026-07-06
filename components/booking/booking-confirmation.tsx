@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -8,14 +10,20 @@ import { formatINR, findBooking, type StoredBooking } from "@/lib/booking"
 
 type BookingConfirmationProps = {
   bookingId?: string
+  recoveryPrefill?: string
 }
 
-export default function BookingConfirmation({ bookingId }: BookingConfirmationProps) {
+export default function BookingConfirmation({ bookingId, recoveryPrefill }: BookingConfirmationProps) {
   const [booking, setBooking] = useState<StoredBooking | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [copyState, setCopyState] = useState("Copy booking ID")
   const [recoveryValue, setRecoveryValue] = useState("")
   const [recoveryMessage, setRecoveryMessage] = useState("")
+  const [otpMode, setOtpMode] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
+  const [otpInput, setOtpInput] = useState("")
+  const [otpSecondsLeft, setOtpSecondsLeft] = useState(0)
+  const router = useRouter()
 
   useEffect(() => {
     if (!bookingId) {
@@ -28,6 +36,13 @@ export default function BookingConfirmation({ bookingId }: BookingConfirmationPr
     setBooking(found ?? null)
     setLoaded(true)
   }, [bookingId])
+
+  useEffect(() => {
+    if (!recoveryPrefill) return
+    setRecoveryValue(recoveryPrefill)
+    // auto-attempt recovery for convenience
+    setTimeout(() => attemptRecovery(), 250)
+  }, [recoveryPrefill])
 
   const shareMessage = useMemo(() => {
     if (!booking) return ""
@@ -56,8 +71,76 @@ export default function BookingConfirmation({ bookingId }: BookingConfirmationPr
     if (found) {
       setBooking(found)
       setRecoveryMessage("Booking found and loaded below.")
+      toast.success("Booking recovered — loaded below.")
+      setOtpMode(false)
+      setOtpSent(false)
+      // redirect to canonical success URL with id so the page shows the id param
+      try {
+        router.push(`/booking/success?id=${encodeURIComponent(found.id)}`)
+      } catch {}
     } else {
       setRecoveryMessage("No booking found for this email/phone.")
+    }
+  }
+
+  const sendOtp = () => {
+    const val = recoveryValue.trim()
+    if (!val) return
+    // generate 6-digit code and store in sessionStorage keyed by value
+    const code = String(Math.floor(100000 + Math.random() * 900000))
+    try {
+      sessionStorage.setItem(`angel_otp_${val}`, code)
+      sessionStorage.setItem(`angel_otp_ts_${val}`, String(Date.now()))
+      setOtpSent(true)
+      setOtpMode(true)
+      // set TTL (seconds) for demo OTP (5 minutes)
+      const ttl = 300
+      setOtpSecondsLeft(ttl)
+      // start countdown
+      const tick = setInterval(() => {
+        setOtpSecondsLeft((s) => {
+          if (s <= 1) {
+            clearInterval(tick)
+            // expire stored OTP
+            try {
+              sessionStorage.removeItem(`angel_otp_${val}`)
+              sessionStorage.removeItem(`angel_otp_ts_${val}`)
+            } catch {}
+            setOtpMode(false)
+            setOtpSent(false)
+            toast.error("OTP expired. Please resend.")
+            return 0
+          }
+          return s - 1
+        })
+      }, 1000)
+      // show the code in a toast for demo (in real app send via SMS/Email)
+      toast.success(`Demo OTP sent: ${code}`)
+    } catch {
+      setRecoveryMessage("Unable to send OTP in this browser.")
+    }
+  }
+
+  const verifyOtp = () => {
+    const val = recoveryValue.trim()
+    if (!val || !otpInput.trim()) return
+    const stored = sessionStorage.getItem(`angel_otp_${val}`)
+    if (stored && stored === otpInput.trim()) {
+      // OTP matches — recover booking by phone/email
+      const found = val.includes("@") ? findBooking({ email: val }) : findBooking({ phone: val })
+      if (found) {
+        setBooking(found)
+        setRecoveryMessage("Booking recovered via OTP.")
+        toast.success("Booking recovered via OTP.")
+        // redirect to canonical success URL with id
+        try {
+          router.push(`/booking/success?id=${encodeURIComponent(found.id)}`)
+        } catch {}
+      } else {
+        setRecoveryMessage("OTP verified but no booking found for this contact.")
+      }
+    } else {
+      setRecoveryMessage("Invalid OTP. Try again.")
     }
   }
 
@@ -187,6 +270,37 @@ export default function BookingConfirmation({ bookingId }: BookingConfirmationPr
                 <Button type="button" variant="outline" onClick={() => setRecoveryValue("")}>Clear</Button>
               </div>
               {recoveryMessage ? <p className="text-sm text-muted-foreground">{recoveryMessage}</p> : null}
+
+              {/* OTP demo flow */}
+              {!booking && recoveryValue ? (
+                <div className="mt-4 space-y-2">
+                  {!otpMode ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <Button type="button" variant="outline" onClick={sendOtp}>
+                        Send OTP
+                      </Button>
+                      <span className="text-sm text-muted-foreground">Verify via SMS/Email (demo)</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <input
+                        value={otpInput}
+                        onChange={(e) => setOtpInput(e.target.value)}
+                        placeholder="Enter OTP"
+                        className="w-full rounded-md border border-border p-2 text-sm"
+                      />
+                      <div className="flex items-center justify-center gap-2">
+                        <Button type="button" onClick={verifyOtp}>
+                          Verify OTP
+                        </Button>
+                        <Button type="button" variant="outline" onClick={() => { setOtpMode(false); setOtpSent(false); setOtpInput("") }}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
           </div>
         ) : null}

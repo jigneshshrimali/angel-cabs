@@ -78,6 +78,31 @@ export default function BookingFlow({ initialParams = {} as Record<string, strin
         passengers: initialParams.passengers ? Number(initialParams.passengers) : prev.passengers,
         vehicle: initialParams.vehicle || prev.vehicle,
       }))
+      // if coordinates are provided, compute distance
+      if (initialParams.pickupLat && initialParams.pickupLng && initialParams.dropLat && initialParams.dropLng) {
+        try {
+          const pl = Number(initialParams.pickupLat)
+          const pg = Number(initialParams.pickupLng)
+          const dl = Number(initialParams.dropLat)
+          const dg = Number(initialParams.dropLng)
+          // call server-side Mapbox Directions to get driving distance
+          fetch(`/api/map/directions?pickupLat=${encodeURIComponent(pl)}&pickupLng=${encodeURIComponent(pg)}&dropLat=${encodeURIComponent(dl)}&dropLng=${encodeURIComponent(dg)}`)
+            .then((r) => r.json())
+            .then((json) => {
+              if (json?.ok && typeof json.distanceMeters === "number") {
+                const km = json.distanceMeters / 1000
+                setValues((v: any) => ({ ...v, distanceKm: Math.max(1, Math.round(km)) }))
+              } else if (initialParams.distanceKm) {
+                setValues((v: any) => ({ ...v, distanceKm: Number(initialParams.distanceKm) }))
+              }
+            })
+            .catch(() => {
+              if (initialParams.distanceKm) setValues((v: any) => ({ ...v, distanceKm: Number(initialParams.distanceKm) }))
+            })
+        } catch {}
+      } else if (initialParams.distanceKm) {
+        setValues((v: any) => ({ ...v, distanceKm: Number(initialParams.distanceKm) }))
+      }
       setStep(initialParams.pickup && initialParams.drop ? 2 : 1)
       setInitialValuesLoaded(true)
       return
@@ -126,6 +151,28 @@ export default function BookingFlow({ initialParams = {} as Record<string, strin
 
     if (params.get("pickup") && params.get("drop")) {
       setStep(2)
+    }
+
+    // if coords present in URL, compute distance
+    const pLat = params.get("pickupLat")
+    const pLng = params.get("pickupLng")
+    const dLat = params.get("dropLat")
+    const dLng = params.get("dropLng")
+    if (pLat && pLng && dLat && dLng) {
+      try {
+        const pl = Number(pLat)
+        const pg = Number(pLng)
+        const dl = Number(dLat)
+        const dg = Number(dLng)
+        fetch(`/api/map/directions?pickupLat=${encodeURIComponent(pl)}&pickupLng=${encodeURIComponent(pg)}&dropLat=${encodeURIComponent(dl)}&dropLng=${encodeURIComponent(dg)}`)
+          .then((r) => r.json())
+          .then((json) => {
+            if (json?.ok && typeof json.distanceMeters === "number") {
+              update({ distanceKm: Math.max(1, Math.round(json.distanceMeters / 1000)) })
+            }
+          })
+          .catch(() => {})
+      } catch {}
     }
 
     toast.success("Prefilled booking fields from Home — you can edit them.")

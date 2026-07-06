@@ -5,11 +5,16 @@ import { Card } from "@/components/ui/card"
 import BookingConfirmation from "@/components/booking/booking-confirmation"
 
 interface SuccessPageProps {
-  searchParams: { id?: string }
+  // searchParams can be a Promise in the dev/runtime environment — await it.
+  searchParams: { id?: string; email?: string; phone?: string } | Promise<{ id?: string; email?: string; phone?: string }>
 }
 
-export default function SuccessPage({ searchParams }: SuccessPageProps) {
-  const id = searchParams.id
+export default async function SuccessPage({ searchParams }: SuccessPageProps) {
+  const params = await searchParams
+  // Normalize id which may be string | string[] | undefined
+  const rawId = params?.id
+  const id = Array.isArray(rawId) ? rawId[0] : rawId
+  const recoveryPrefill = Array.isArray(params?.email) ? params?.email[0] : params?.email || (Array.isArray(params?.phone) ? params?.phone[0] : params?.phone) || undefined
 
   return (
     <div className="container-page py-16">
@@ -28,7 +33,7 @@ export default function SuccessPage({ searchParams }: SuccessPageProps) {
             Your booking has been successfully created. Use the reference below to track the ride and review trip details.
           </p>
           <p className="mt-6 rounded-3xl bg-secondary/5 px-5 py-4 text-2xl font-semibold text-foreground">
-            {id ? id : "Reference unavailable"}
+            {id ? id : "—"}
           </p>
           <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <Button asChild>
@@ -40,7 +45,7 @@ export default function SuccessPage({ searchParams }: SuccessPageProps) {
           </div>
         </Card>
 
-        <BookingConfirmation bookingId={id} />
+        <BookingConfirmation bookingId={id ?? undefined} recoveryPrefill={recoveryPrefill} />
       </div>
     </div>
   )

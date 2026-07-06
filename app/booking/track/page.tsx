@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { toast } from "sonner"
 import { SectionHeading } from "@/components/shared/section-heading"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -99,7 +100,45 @@ export default function TrackPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <p className="text-lg font-semibold">Booking {result.id}</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-lg font-semibold">Booking {result.id}</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(result.id)
+                          toast.success("Booking ID copied to clipboard")
+                        } catch {
+                          toast.error("Unable to copy booking ID")
+                        }
+                      }}
+                      className="inline-flex items-center rounded-md border border-border px-3 py-1 text-sm"
+                    >
+                      Copy
+                    </button>
+                    <a
+                      href={`mailto:${result.email || ""}?subject=${encodeURIComponent(
+                        `Angel Cabs booking ${result.id}`,
+                      )}&body=${encodeURIComponent(
+                        `Booking ${result.id}\nPickup: ${result.pickup}\nDrop: ${result.drop}\nDate: ${result.date} ${result.time}\nFare: ₹${result.fare}`,
+                      )}`}
+                      className={`inline-flex items-center rounded-md px-3 py-1 text-sm ${result.email ? "border border-border" : "opacity-50 pointer-events-none"}`}
+                    >
+                      Email
+                    </a>
+                    <a
+                      href={`https://wa.me/?text=${encodeURIComponent(
+                        `Angel Cabs booking ${result.id} - Pickup: ${result.pickup} to ${result.drop} on ${result.date} ${result.time}. Fare: ₹${result.fare}`,
+                      )}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center rounded-md border border-border px-3 py-1 text-sm"
+                    >
+                      WhatsApp
+                    </a>
+                  </div>
+                </div>
                 <p className="text-sm text-muted-foreground">
                   Status: <span className="font-semibold text-foreground">{result.status || "Confirmed"}</span>
                 </p>

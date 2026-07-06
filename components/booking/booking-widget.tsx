@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import dynamic from "next/dynamic"
+import { distanceKm, type LatLng } from "@/lib/geo"
+import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { MapPin, CalendarClock, Users, Search, Navigation } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -22,19 +25,43 @@ export function BookingWidget({ variant = "card" }: { variant?: "card" | "bar" }
   const [tripType, setTripType] = useState<TripType>("one-way")
   const [pickup, setPickup] = useState("")
   const [drop, setDrop] = useState("")
+  const [pickupCoord, setPickupCoord] = useState<LatLng | null>(null)
+  const [dropCoord, setDropCoord] = useState<LatLng | null>(null)
+  const [showPicker, setShowPicker] = useState(false)
+  const [pickerTarget, setPickerTarget] = useState<"pickup" | "drop">("pickup")
+
   const [date, setDate] = useState(dt.date)
   const [time, setTime] = useState(dt.time)
   const [passengers, setPassengers] = useState(2)
 
-  const popularLocations = [
-    "Ahmedabad Airport",
+  const [popularLocations, setPopularLocations] = useState<string[]>([
+    "Rajkot Airport",
+    "Rajkot Railway Station",
+    "Rajkot Bus Station",
+    "Rajkot Main Highway",
+    "Rajkot Ring Road",
+    "Rajkot Race Course",
+    "Rajkot Bus Stand",
+    "Gondal",
+    "Jamnagar",
+    "Porbandar",
+    "Bhavnagar",
+    "Gir National Park",
+    "Sasan Gir",
+    "Dwarka",
+    "Somnath",
+    "Diu",
+    "Surat",
     "Vadodara",
+    "Anand",
     "Gandhinagar",
-    "Sabarmati",
-    "Sarkhej",
-    "Navrangpura",
-    "Gota",
-  ]
+    "Ahmedabad",
+    "Ahmedabad Airport",
+    "Bhuj",
+    "Palanpur",
+    "Saputara",
+  ])
+  const popularSummary = `${popularLocations.slice(0, 8).join(", ")}, and more.`
 
   const onSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -46,6 +73,17 @@ export function BookingWidget({ variant = "card" }: { variant?: "card" | "bar" }
       time,
       passengers: String(passengers),
     })
+    if (pickupCoord) {
+      params.set("pickupLat", String(pickupCoord.lat))
+      params.set("pickupLng", String(pickupCoord.lng))
+    }
+    if (dropCoord) {
+      params.set("dropLat", String(dropCoord.lat))
+      params.set("dropLng", String(dropCoord.lng))
+    }
+    if (computedDistance) {
+      params.set("distanceKm", String(computedDistance.toFixed(2)))
+    }
     router.push(`/booking?${params.toString()}`)
   }
 
@@ -65,6 +103,8 @@ export function BookingWidget({ variant = "card" }: { variant?: "card" | "bar" }
 
   const canSearch = Boolean(pickup.trim() && drop.trim())
   const ctaText = canSearch ? "Continue to booking" : "Start booking"
+
+  const computedDistance = pickupCoord && dropCoord ? distanceKm(pickupCoord.lat, pickupCoord.lng, dropCoord.lat, dropCoord.lng) : null
 
   return (
     <form
@@ -94,62 +134,64 @@ export function BookingWidget({ variant = "card" }: { variant?: "card" | "bar" }
         ))}
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-        <Field icon={<MapPin className="h-4 w-4 text-primary" />} label="Pickup">
+      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+        <Field icon={<MapPin className="h-4 w-4 text-primary" />} label="Pickup Location">
           <div>
-            <Input
-              value={pickup}
-              onChange={(e) => setPickup(e.target.value)}
-              placeholder="Enter pickup location"
-              aria-label="Pickup location"
-              list="popular-locations"
-              className="border-0 px-0 shadow-none focus-visible:ring-0"
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                value={pickup}
+                onChange={(e) => setPickup(e.target.value)}
+                placeholder="Enter pickup location"
+                aria-label="Pickup location"
+                list="popular-locations"
+                className="h-10 border-0 px-0 shadow-none focus-visible:ring-0"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const name = window.prompt("Add new pickup place (e.g. 'New Landmark, Rajkot')")
+                  if (!name) return
+                  setPopularLocations((p) => [name, ...p])
+                  setPickup(name)
+                }}
+                className="rounded-md border border-border bg-background px-2 py-1 text-xs font-semibold text-foreground"
+              >
+                Add
+              </button>
+            </div>
 
-            <div className="mt-2 flex flex-wrap gap-2">
-              {popularLocations.map((loc) => (
-                <button
-                  key={`pickup-${loc}`}
-                  type="button"
-                  onClick={() => setPickup(loc)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") setPickup(loc)
-                  }}
-                  className="rounded-full bg-muted/60 px-3 py-1 text-xs font-medium text-foreground hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary"
-                  aria-pressed={pickup === loc}
-                >
-                  {loc}
-                </button>
-              ))}
+            <div className="mt-1">
+              <p className="text-xs text-secondary-foreground/70">Popular Gujarat locations: {popularSummary}</p>
             </div>
           </div>
         </Field>
-        <Field icon={<Navigation className="h-4 w-4 text-primary" />} label="Drop">
+        <Field icon={<Navigation className="h-4 w-4 text-primary" />} label="Drop Location">
           <div>
-            <Input
-              value={drop}
-              onChange={(e) => setDrop(e.target.value)}
-              placeholder="Enter drop location"
-              aria-label="Drop location"
-              list="popular-locations"
-              className="border-0 px-0 shadow-none focus-visible:ring-0"
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                value={drop}
+                onChange={(e) => setDrop(e.target.value)}
+                placeholder="Enter drop location"
+                aria-label="Drop location"
+                list="popular-locations"
+                className="h-10 border-0 px-0 shadow-none focus-visible:ring-0"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const name = window.prompt("Add new drop place (e.g. 'New Landmark')")
+                  if (!name) return
+                  setPopularLocations((p) => [name, ...p])
+                  setDrop(name)
+                }}
+                className="rounded-md border border-border bg-background px-2 py-1 text-xs font-semibold text-foreground"
+              >
+                Add
+              </button>
+            </div>
 
-            <div className="mt-2 flex flex-wrap gap-2">
-              {popularLocations.map((loc) => (
-                <button
-                  key={`drop-${loc}`}
-                  type="button"
-                  onClick={() => setDrop(loc)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") setDrop(loc)
-                  }}
-                  className="rounded-full bg-muted/60 px-3 py-1 text-xs font-medium text-foreground hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary"
-                  aria-pressed={drop === loc}
-                >
-                  {loc}
-                </button>
-              ))}
+            <div className="mt-1">
+              <p className="text-xs text-secondary-foreground/70">Popular Gujarat locations: {popularSummary}</p>
             </div>
           </div>
         </Field>
@@ -193,7 +235,11 @@ export function BookingWidget({ variant = "card" }: { variant?: "card" | "bar" }
         ))}
       </datalist>
 
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {computedDistance ? (
+        <p className="mt-2 text-sm text-muted-foreground">Estimated distance: <strong>{computedDistance.toFixed(2)} km</strong></p>
+      ) : null}
+
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
           {canSearch
             ? "Continue to booking with your pickup and drop already set."
@@ -204,6 +250,8 @@ export function BookingWidget({ variant = "card" }: { variant?: "card" | "bar" }
           {ctaText}
         </Button>
       </div>
+
+      {/* Map picker disabled for POC to simplify UI */}
     </form>
   )
 }

@@ -1,4 +1,8 @@
+"use client"
+
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useState } from "react"
 import { Phone, Mail, MapPin } from "lucide-react"
 import { Logo } from "@/components/layout/logo"
 import { footerNav } from "@/lib/navigation"
@@ -6,9 +10,19 @@ import { siteConfig, telLink, whatsappLink } from "@/lib/site"
 import { Newsletter } from "@/components/layout/newsletter"
 
 export function Footer() {
+  const [id, setId] = useState("")
+  const router = useRouter()
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!id.trim()) return
+    // navigate to track page with id param
+    router.push(`/booking/track?id=${encodeURIComponent(id.trim())}`)
+  }
+
   return (
     <footer className="mt-20 bg-secondary text-secondary-foreground">
-      <div className="container-page grid gap-10 py-14 md:grid-cols-2 lg:grid-cols-5">
+      <div className="container-page grid gap-10 py-14 md:grid-cols-2 lg:grid-cols-6">
         <div className="lg:col-span-2">
           <Logo invert />
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-secondary-foreground/70">
@@ -50,13 +64,32 @@ export function Footer() {
             </ul>
           </div>
         ))}
-      </div>
 
-      <div className="container-page pb-10">
-        <Newsletter />
+        {/* (Track + Newsletter moved to a dedicated second row below) */}
       </div>
-
+      
+      {/* Row 2: Track Booking (left) + Newsletter (right) */}
       <div className="border-t border-background/10">
+        <div className="container-page grid grid-cols-1 gap-6 py-6 md:grid-cols-2">
+          <div>
+            <h3 className="text-sm font-semibold">Track Booking</h3>
+            <p className="mt-2 text-sm text-secondary-foreground/70">Quickly lookup your booking by reference, phone or email.</p>
+            <form onSubmit={onSubmit} className="mt-3 flex gap-2">
+              <input
+                value={id}
+                onChange={(e) => setId(e.target.value)}
+                placeholder="Enter booking ID or phone"
+                className="w-full rounded-md border border-border px-3 py-2 text-sm"
+                aria-label="Track booking"
+              />
+              <button type="submit" className="rounded-md bg-primary px-3 py-2 text-sm text-white">Go</button>
+            </form>
+          </div>
+
+          <div>
+            <Newsletter />
+          </div>
+        </div>
         <div className="container-page flex flex-col items-center justify-between gap-3 py-6 text-center text-xs text-secondary-foreground/60 sm:flex-row sm:text-left">
           <p>© {new Date().getFullYear()} {siteConfig.name}. All rights reserved.</p>
           <p className="font-medium uppercase tracking-wider text-secondary-foreground/70">

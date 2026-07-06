@@ -94,6 +94,9 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <Link href="/booking/track" className="hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground lg:inline-flex">
+            Track Booking
+          </Link>
           <a
             href={telLink()}
             className="hidden items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:text-primary md:inline-flex"
