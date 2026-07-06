@@ -1,9 +1,17 @@
-"use client"
-
-import { useSearchParams } from "next/navigation"
 import BookingFlow from "@/components/booking/booking-flow"
 
-export default function BookingPage() {
-  const params = useSearchParams()
-  return <BookingFlow initialParams={Object.fromEntries(params.entries())} />
+interface BookingPageProps {
+  searchParams: Record<string, string | string[] | undefined>
+}
+
+export default function BookingPage({ searchParams }: BookingPageProps) {
+  const initialParams: Record<string, string> = {}
+
+  Object.entries(searchParams).forEach(([key, value]) => {
+    if (typeof value === "string") {
+      initialParams[key] = value
+    }
+  })
+
+  return <BookingFlow initialParams={initialParams} />
 }

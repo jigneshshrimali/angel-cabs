@@ -88,6 +88,35 @@ export function formatINR(amount: number) {
   }).format(amount)
 }
 
+export type StoredBooking = BookingValues & {
+  id: string
+  fare: number
+  status: string
+  createdAt: string
+}
+
+export function getStoredBookings(): StoredBooking[] {
+  if (typeof window === "undefined") return []
+  try {
+    return JSON.parse(localStorage.getItem("angel_bookings") || "[]") as StoredBooking[]
+  } catch {
+    return []
+  }
+}
+
+export function findBooking(query: { id?: string; email?: string; phone?: string }): StoredBooking | undefined {
+  const bookings = getStoredBookings()
+  const normalizedQuery = Object.fromEntries(
+    Object.entries(query).map(([key, value]) => [key, value?.trim().toLowerCase()]),
+  ) as Record<string, string | undefined>
+  return bookings.find((booking) => {
+    if (normalizedQuery.id && booking.id.toLowerCase() === normalizedQuery.id) return true
+    if (normalizedQuery.email && booking.email?.toLowerCase() === normalizedQuery.email) return true
+    if (normalizedQuery.phone && booking.phone.toLowerCase() === normalizedQuery.phone) return true
+    return false
+  })
+}
+
 export function generateBookingId() {
   const n = Math.floor(100000 + Math.random() * 900000)
   return `AC-${n}`

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MapPin, CalendarClock, Users, Search, Navigation } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -26,6 +26,16 @@ export function BookingWidget({ variant = "card" }: { variant?: "card" | "bar" }
   const [time, setTime] = useState(dt.time)
   const [passengers, setPassengers] = useState(2)
 
+  const popularLocations = [
+    "Ahmedabad Airport",
+    "Vadodara",
+    "Gandhinagar",
+    "Sabarmati",
+    "Sarkhej",
+    "Navrangpura",
+    "Gota",
+  ]
+
   const onSearch = (e: React.FormEvent) => {
     e.preventDefault()
     const params = new URLSearchParams({
@@ -38,6 +48,23 @@ export function BookingWidget({ variant = "card" }: { variant?: "card" | "bar" }
     })
     router.push(`/booking?${params.toString()}`)
   }
+
+  // Persist draft to sessionStorage (and localStorage as fallback) so home inputs
+  // are available across navigation within the same browser session.
+  useEffect(() => {
+    try {
+      const draft = { tripType, pickup, drop, date, time, passengers }
+      // session cookie (no expires) for session-scoped cross-tab semantics
+      document.cookie = `angel_booking_draft=${encodeURIComponent(JSON.stringify(draft))}; path=/`
+      sessionStorage.setItem("angel_booking_draft", JSON.stringify(draft))
+      localStorage.setItem("angel_booking_draft", JSON.stringify(draft))
+    } catch {
+      // ignore storage errors
+    }
+  }, [tripType, pickup, drop, date, time, passengers])
+
+  const canSearch = Boolean(pickup.trim() && drop.trim())
+  const ctaText = canSearch ? "Continue to booking" : "Start booking"
 
   return (
     <form
@@ -69,22 +96,62 @@ export function BookingWidget({ variant = "card" }: { variant?: "card" | "bar" }
 
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         <Field icon={<MapPin className="h-4 w-4 text-primary" />} label="Pickup">
-          <Input
-            value={pickup}
-            onChange={(e) => setPickup(e.target.value)}
-            placeholder="Enter pickup location"
-            aria-label="Pickup location"
-            className="border-0 px-0 shadow-none focus-visible:ring-0"
-          />
+          <div>
+            <Input
+              value={pickup}
+              onChange={(e) => setPickup(e.target.value)}
+              placeholder="Enter pickup location"
+              aria-label="Pickup location"
+              list="popular-locations"
+              className="border-0 px-0 shadow-none focus-visible:ring-0"
+            />
+
+            <div className="mt-2 flex flex-wrap gap-2">
+              {popularLocations.map((loc) => (
+                <button
+                  key={`pickup-${loc}`}
+                  type="button"
+                  onClick={() => setPickup(loc)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") setPickup(loc)
+                  }}
+                  className="rounded-full bg-muted/60 px-3 py-1 text-xs font-medium text-foreground hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary"
+                  aria-pressed={pickup === loc}
+                >
+                  {loc}
+                </button>
+              ))}
+            </div>
+          </div>
         </Field>
         <Field icon={<Navigation className="h-4 w-4 text-primary" />} label="Drop">
-          <Input
-            value={drop}
-            onChange={(e) => setDrop(e.target.value)}
-            placeholder="Enter drop location"
-            aria-label="Drop location"
-            className="border-0 px-0 shadow-none focus-visible:ring-0"
-          />
+          <div>
+            <Input
+              value={drop}
+              onChange={(e) => setDrop(e.target.value)}
+              placeholder="Enter drop location"
+              aria-label="Drop location"
+              list="popular-locations"
+              className="border-0 px-0 shadow-none focus-visible:ring-0"
+            />
+
+            <div className="mt-2 flex flex-wrap gap-2">
+              {popularLocations.map((loc) => (
+                <button
+                  key={`drop-${loc}`}
+                  type="button"
+                  onClick={() => setDrop(loc)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") setDrop(loc)
+                  }}
+                  className="rounded-full bg-muted/60 px-3 py-1 text-xs font-medium text-foreground hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary"
+                  aria-pressed={drop === loc}
+                >
+                  {loc}
+                </button>
+              ))}
+            </div>
+          </div>
         </Field>
         <Field icon={<CalendarClock className="h-4 w-4 text-primary" />} label="Date & Time">
           <div className="flex gap-2">
@@ -120,10 +187,23 @@ export function BookingWidget({ variant = "card" }: { variant?: "card" | "bar" }
         </Field>
       </div>
 
-      <Button type="submit" size="lg" className="mt-4 h-12 w-full text-base font-semibold">
-        <Search className="h-4 w-4" />
-        Search Cabs
-      </Button>
+      <datalist id="popular-locations">
+        {popularLocations.map((location) => (
+          <option key={location} value={location} />
+        ))}
+      </datalist>
+
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted-foreground">
+          {canSearch
+            ? "Continue to booking with your pickup and drop already set."
+            : "Enter pickup and drop locations to start your ride booking."}
+        </p>
+        <Button type="submit" size="lg" className="h-12 w-full sm:w-auto text-base font-semibold" disabled={!canSearch}>
+          <Search className="h-4 w-4" />
+          {ctaText}
+        </Button>
+      </div>
     </form>
   )
 }
